@@ -1584,32 +1584,38 @@ class EliminateInterleaves : public IRMutator2 {
 
         if (buffers.contains(op->name)) {
             // When inspecting the stores to a buffer, update the state.
-            BufferState &state = buffers.ref(op->name);
+            // BufferState &state = buffers.ref(op->name);
             if (!is_one(predicate) || !op->value.type().is_vector()) {
                 // TODO(psuriana): This store is predicated. Mark the buffer as
                 // not interleaved for now.
-                state = BufferState::NotInterleaved;
+                //state = BufferState::NotInterleaved;
+                buffers.replace(op->name, BufferState::NotInterleaved);
             } else if (yields_removable_interleave(value)) {
                 // The value yields a removable interleave. If we aren't tracking
                 // this buffer, mark it as interleaved.
-                if (state == BufferState::Unknown) {
-                    state = BufferState::Interleaved;
+                // if (state == BufferState::Unknown) {
+                //     state = BufferState::Interleaved;
+                // }
+                if (buffers.get(op->name) == BufferState::Unknown) {
+                    buffers.replace(op->name, BufferState::Interleaved);
                 }
             } else if (!yields_interleave(value)) {
                 // The value does not yield an interleave. Mark the
                 // buffer as not interleaved.
-                state = BufferState::NotInterleaved;
+                // state = BufferState::NotInterleaved;
+                buffers.replace(op->name, BufferState::NotInterleaved);
             } else {
                 // If the buffer yields an interleave, but is not an
                 // interleave itself, we don't want to change the
                 // buffer state.
             }
             internal_assert(aligned_buffer_access.contains(op->name) && "Buffer not found in scope");
-            bool &aligned_accesses = aligned_buffer_access.ref(op->name);
+            // bool &aligned_accesses = aligned_buffer_access.ref(op->name);
             int aligned_offset = 0;
 
             if (!alignment_analyzer.is_aligned(op, &aligned_offset)) {
-                aligned_accesses = false;
+                aligned_buffer_access.replace(op->name, false);
+                // aligned_accesses = false;
             }
         }
         if (deinterleave_buffers.contains(op->name)) {
@@ -1639,17 +1645,19 @@ class EliminateInterleaves : public IRMutator2 {
                 // actually interleaved (and don't just yield an
                 // interleave).
                 internal_assert(aligned_buffer_access.contains(op->name) && "Buffer not found in scope");
-                bool &aligned_accesses = aligned_buffer_access.ref(op->name);
+                // bool &aligned_accesses = aligned_buffer_access.ref(op->name);
                 int aligned_offset = 0;
 
                 if (!alignment_analyzer.is_aligned(op, &aligned_offset)) {
-                    aligned_accesses = false;
+                    // aligned_accesses = false;
+                    aligned_buffer_access.replace(op->name, false);
                 }
             } else {
                 // This is not a double vector load, so we can't
                 // deinterleave the storage of this buffer.
-                BufferState &state = buffers.ref(op->name);
-                state = BufferState::NotInterleaved;
+                // BufferState &state = buffers.ref(op->name);
+                // state = BufferState::NotInterleaved;
+                buffers.replace(op->name, BufferState::NotInterleaved);
             }
         }
         Expr expr = IRMutator2::visit(op);

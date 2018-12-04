@@ -45,17 +45,23 @@ void Simplify::found_buffer_reference(const string &name, size_t dimensions) {
     for (size_t i = 0; i < dimensions; i++) {
         string stride = name + ".stride." + std::to_string(i);
         if (var_info.contains(stride)) {
-            var_info.ref(stride).old_uses++;
+            auto info = var_info.get(stride);
+            info.old_uses++;
+            var_info.replace(stride, info);
         }
 
         string min = name + ".min." + std::to_string(i);
         if (var_info.contains(min)) {
-            var_info.ref(min).old_uses++;
+            auto info = var_info.get(min);
+            info.old_uses++;
+            var_info.replace(min, info);
         }
     }
 
     if (var_info.contains(name)) {
-        var_info.ref(name).old_uses++;
+        auto info = var_info.get(name);
+        info.old_uses++;
+        var_info.replace(name, info);
     }
 }
 

@@ -51,7 +51,7 @@ Expr Simplify::visit(const Variable *op, ConstBounds *bounds) {
     }
 
     if (var_info.contains(op->name)) {
-        auto &info = var_info.ref(op->name);
+        auto info = var_info.get(op->name);
 
         // if replacement is defined, we should substitute it in (unless
         // it's a var that has been hidden by a nested scope).
@@ -61,6 +61,7 @@ Expr Simplify::visit(const Variable *op, ConstBounds *bounds) {
                 << " of type " << op->type
                 << " with expression of type " << info.replacement.type() << "\n";
             info.new_uses++;
+            var_info.replace(op->name, info);
             // We want to remutate the replacement, because we may be
             // injecting it into a context where it is known to be a
             // constant (e.g. due to an if).
@@ -69,6 +70,7 @@ Expr Simplify::visit(const Variable *op, ConstBounds *bounds) {
             // This expression was not something deemed
             // substitutable - no replacement is defined.
             info.old_uses++;
+            var_info.replace(op->name, info);
             return op;
         }
     } else {

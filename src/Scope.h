@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include <stack>
 #include <string>
 #include <utility>
@@ -89,17 +90,18 @@ public:
 template<typename T = void>
 class Scope {
 private:
-    std::map<std::string, SmallStack<T>> table;
+    std::map<std::string, SmallStack<T>> m_table;
+    std::unordered_map<std::string, SmallStack<T>> o_table;
 
     // Copying a scope object copies a large table full of strings and
     // stacks. Bad idea.
     Scope(const Scope<T> &);
     Scope<T> &operator=(const Scope<T> &);
 
-    const Scope<T> *containing_scope;
+    const Scope<T> *containing_scope = nullptr;
 
 public:
-    Scope() : containing_scope(nullptr) {}
+    Scope() = default;
 
     /** Set the parent scope. If lookups fail in this scope, they
      * check the containing scope before returning an error. Caller is
@@ -120,38 +122,54 @@ public:
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
     T2 get(const std::string &name) const {
-        typename std::map<std::string, SmallStack<T>>::const_iterator iter = table.find(name);
-        if (iter == table.end() || iter->second.empty()) {
+        auto m_iter = m_table.find(name);
+        auto o_iter = o_table.find(name);
+        internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
+
+        if (m_iter == m_table.end() || m_iter->second.empty()) {
             if (containing_scope) {
                 return containing_scope->get(name);
             } else {
                 internal_error << "Name not in Scope: " << name << "\n" << *this << "\n";
             }
         }
-        return iter->second.top();
+        internal_assert(m_iter->first == o_iter->first);
+        // internal_assert(m_iter->second == o_iter->second);
+        return m_iter->second.top();
     }
 
     /** Return a reference to an entry. Does not consider the containing scope. */
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
-    T2 &ref(const std::string &name) {
-        typename std::map<std::string, SmallStack<T>>::iterator iter = table.find(name);
-        if (iter == table.end() || iter->second.empty()) {
+    void replace(const std::string &name, const T2 &value) {
+        auto m_iter = m_table.find(name);
+        auto o_iter = o_table.find(name);
+        internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
+
+        if (m_iter == m_table.end() || m_iter->second.empty()) {
             internal_error << "Name not in Scope: " << name << "\n" << *this << "\n";
         }
-        return iter->second.top_ref();
+
+        internal_assert(m_iter->first == o_iter->first);
+        m_iter->second.top_ref() = value;
+        o_iter->second.top_ref() = value;
     }
 
     /** Tests if a name is in scope */
     bool contains(const std::string &name) const {
-        typename std::map<std::string, SmallStack<T>>::const_iterator iter = table.find(name);
-        if (iter == table.end() || iter->second.empty()) {
+        auto m_iter = m_table.find(name);
+        auto o_iter = o_table.find(name);
+        internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
+
+        if (m_iter == m_table.end() || m_iter->second.empty()) {
             if (containing_scope) {
                 return containing_scope->contains(name);
             } else {
                 return false;
             }
         }
+
+        internal_assert(m_iter->first == o_iter->first);
         return true;
     }
 
@@ -161,70 +179,95 @@ public:
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
     void push(const std::string &name, const T2 &value) {
-        table[name].push(value);
+        m_table[name].push(value);
+        o_table[name].push(value);
     }
 
     template<typename T2 = T,
              typename = typename std::enable_if<std::is_same<T2, void>::value>::type>
     void push(const std::string &name) {
-        table[name].push();
+        m_table[name].push();
+        o_table[name].push();
     }
 
     /** A name goes out of scope. Restore whatever its old value
      * was (or remove it entirely if there was nothing else of the
      * same name in an outer scope) */
     void pop(const std::string &name) {
-        typename std::map<std::string, SmallStack<T>>::iterator iter = table.find(name);
-        internal_assert(iter != table.end()) << "Name not in Scope: " << name << "\n" << *this << "\n";
-        iter->second.pop();
-        if (iter->second.empty()) {
-            table.erase(iter);
+        auto m_iter = m_table.find(name);
+        auto o_iter = o_table.find(name);
+        internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
+
+        internal_assert(m_iter != m_table.end()) << "Name not in Scope: " << name << "\n" << *this << "\n";
+        internal_assert(m_iter->first == o_iter->first);
+        m_iter->second.pop();
+        o_iter->second.pop();
+        if (m_iter->second.empty()) {
+            m_table.erase(m_iter);
+        }
+        if (o_iter->second.empty()) {
+            o_table.erase(o_iter);
         }
     }
 
     /** Iterate through the scope. Does not capture any containing scope. */
     class const_iterator {
-        typename std::map<std::string, SmallStack<T>>::const_iterator iter;
+        typename std::map<std::string, SmallStack<T>>::const_iterator m_iter;
     public:
         explicit const_iterator(const typename std::map<std::string, SmallStack<T>>::const_iterator &i) :
-            iter(i) {
+            m_iter(i) {
         }
 
         const_iterator() {}
 
         bool operator!=(const const_iterator &other) {
-            return iter != other.iter;
+            return m_iter != other.m_iter;
         }
 
         void operator++() {
-            ++iter;
+            ++m_iter;
         }
 
         const std::string &name() {
-            return iter->first;
+            return m_iter->first;
         }
 
         const SmallStack<T> &stack() {
-            return iter->second;
+            return m_iter->second;
         }
 
         template<typename T2 = T,
                  typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
         const T2 &value() {
-            return iter->second.top_ref();
+            return m_iter->second.top_ref();
         }
     };
 
     const_iterator cbegin() const {
-        return const_iterator(table.begin());
+        assert(m_table.size() == o_table.size());
+if (m_table.size()) {
+std::ostringstream o;
+o<<"Iterating over Scope, ordered is:\n";
+for (const auto &m : m_table) {
+    o << "  " << m.first << "\n";
+}
+o<<"unordered is:\n";
+for (const auto &m : o_table) {
+    o << "  " << m.first << "\n";
+}
+o << "\n";
+std::cerr<<o.str()<<std::flush;
+}
+        return const_iterator(m_table.begin());
     }
 
     const_iterator cend() const {
-        return const_iterator(table.end());
+        return const_iterator(m_table.end());
     }
 
     void swap(Scope<T> &other) {
-        table.swap(other.table);
+        m_table.swap(other.m_table);
+        o_table.swap(other.o_table);
         std::swap(containing_scope, other.containing_scope);
     }
 };
@@ -232,9 +275,9 @@ public:
 template<typename T>
 std::ostream &operator<<(std::ostream &stream, const Scope<T>& s) {
     stream << "{\n";
-    typename Scope<T>::const_iterator iter;
-    for (iter = s.cbegin(); iter != s.cend(); ++iter) {
-        stream << "  " << iter.name() << "\n";
+    typename Scope<T>::const_iterator m_iter;
+    for (m_iter = s.cbegin(); m_iter != s.cend(); ++m_iter) {
+        stream << "  " << m_iter.name() << "\n";
     }
     stream << "}";
     return stream;
