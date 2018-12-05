@@ -29,8 +29,10 @@ private:
     bool _empty;
 
 public:
+HALIDE_ALWAYS_INLINE
     SmallStack() : _empty(true) {}
 
+HALIDE_ALWAYS_INLINE
     void pop() {
         if (_rest.empty()) {
             _empty = true;
@@ -41,6 +43,7 @@ public:
         }
     }
 
+HALIDE_ALWAYS_INLINE
     void push(const T &t) {
         if (_empty) {
             _empty = false;
@@ -50,18 +53,22 @@ public:
         _top = t;
     }
 
+HALIDE_ALWAYS_INLINE
     T top() const {
         return _top;
     }
 
+HALIDE_ALWAYS_INLINE
     T &top_ref() {
         return _top;
     }
 
+HALIDE_ALWAYS_INLINE
     const T &top_ref() const {
         return _top;
     }
 
+HALIDE_ALWAYS_INLINE
     bool empty() const {
         return _empty;
     }
@@ -72,12 +79,15 @@ class SmallStack<void> {
     // A stack of voids. Voids are all the same, so just record how many voids are in the stack
     int counter = 0;
 public:
+HALIDE_ALWAYS_INLINE
     void pop() {
         counter--;
     }
+HALIDE_ALWAYS_INLINE
     void push() {
         counter++;
     }
+HALIDE_ALWAYS_INLINE
     bool empty() const {
         return counter == 0;
     }
@@ -101,6 +111,7 @@ private:
     const Scope<T> *containing_scope = nullptr;
 
 public:
+HALIDE_ALWAYS_INLINE
     Scope() = default;
 
 HALIDE_ALWAYS_INLINE
@@ -259,7 +270,6 @@ HALIDE_ALWAYS_INLINE
     };
 
  HALIDE_ALWAYS_INLINE
-
     const_iterator cbegin() const {
         assert(m_table.size() == o_table.size());
 if (m_table.size()) {
@@ -293,6 +303,7 @@ HALIDE_ALWAYS_INLINE
 };
 
 template<typename T>
+HALIDE_ALWAYS_INLINE
 std::ostream &operator<<(std::ostream &stream, const Scope<T>& s) {
     stream << "{\n";
     typename Scope<T>::const_iterator m_iter;
@@ -315,16 +326,19 @@ template<typename T = void>
 struct ScopedBinding {
     Scope<T> *scope;
     std::string name;
+HALIDE_ALWAYS_INLINE
     ScopedBinding(Scope<T> &s, const std::string &n, const T &value) :
         scope(&s), name(n) {
         scope->push(name, value);
     }
+HALIDE_ALWAYS_INLINE
     ScopedBinding(bool condition, Scope<T> &s, const std::string &n, const T &value) :
         scope(condition ? &s : nullptr), name(n) {
         if (condition) {
             scope->push(name, value);
         }
     }
+HALIDE_ALWAYS_INLINE
     ~ScopedBinding() {
         if (scope) {
             scope->pop(name);
@@ -336,15 +350,18 @@ template<>
 struct ScopedBinding<void> {
     Scope<> *scope;
     std::string name;
+HALIDE_ALWAYS_INLINE
     ScopedBinding(Scope<> &s, const std::string &n) : scope(&s), name(n) {
         scope->push(name);
     }
+HALIDE_ALWAYS_INLINE
     ScopedBinding(bool condition, Scope<> &s, const std::string &n) :
         scope(condition ? &s : nullptr), name(n) {
         if (condition) {
             scope->push(name);
         }
     }
+HALIDE_ALWAYS_INLINE
     ~ScopedBinding() {
         if (scope) {
             scope->pop(name);
