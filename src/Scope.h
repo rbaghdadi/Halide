@@ -29,7 +29,7 @@ private:
     bool _empty;
 
 public:
-HALIDE_ALWAYS_INLINE
+ HALIDE_ALWAYS_INLINE
     SmallStack() : _empty(true) {}
 
 HALIDE_ALWAYS_INLINE
