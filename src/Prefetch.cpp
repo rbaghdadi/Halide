@@ -75,7 +75,7 @@ private:
 
     Box get_buffer_bounds(string name, int dims) {
         if (buffer_bounds.contains(name)) {
-            const Box &b = buffer_bounds.ref(name);
+            Box b = buffer_bounds.get(name);
             internal_assert((int)b.size() == dims);
             return b;
         }

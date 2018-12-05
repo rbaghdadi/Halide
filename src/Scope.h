@@ -131,15 +131,16 @@ public:
         return iter->second.top();
     }
 
-    /** Return a reference to an entry. Does not consider the containing scope. */
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
-    T2 &ref(const std::string &name) {
-        typename std::map<std::string, SmallStack<T>>::iterator iter = table.find(name);
+    void replace(const std::string &name, const T2 &value) {
+        auto iter = table.find(name);
+
         if (iter == table.end() || iter->second.empty()) {
             internal_error << "Name not in Scope: " << name << "\n" << *this << "\n";
         }
-        return iter->second.top_ref();
+
+        iter->second.top_ref() = value;
     }
 
     /** Tests if a name is in scope */
