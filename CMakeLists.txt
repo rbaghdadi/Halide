@@ -199,7 +199,7 @@ function(halide_project name folder)
 endfunction(halide_project)
 
 # Set warnings globally
-option(WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
+option(WARNINGS_AS_ERRORS "Treat warnings as errors" OFF)
 if (WARNINGS_AS_ERRORS)
     message(STATUS "WARNINGS_AS_ERRORS enabled")
 else()
