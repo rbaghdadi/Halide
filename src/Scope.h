@@ -103,6 +103,7 @@ private:
 public:
     Scope() = default;
 
+HALIDE_ALWAYS_INLINE
     /** Set the parent scope. If lookups fail in this scope, they
      * check the containing scope before returning an error. Caller is
      * responsible for managing the memory of the containing scope. */
@@ -110,6 +111,7 @@ public:
         containing_scope = s;
     }
 
+HALIDE_ALWAYS_INLINE
     /** A const ref to an empty scope. Useful for default function
      * arguments, which would otherwise require a copy constructor
      * (with llvm in c++98 mode) */
@@ -121,6 +123,7 @@ public:
     /** Retrieve the value referred to by a name */
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
     T2 get(const std::string &name) const {
         auto m_iter = m_table.find(name);
         auto o_iter = o_table.find(name);
@@ -141,6 +144,7 @@ public:
     /** Return a reference to an entry. Does not consider the containing scope. */
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
     void replace(const std::string &name, const T2 &value) {
         auto m_iter = m_table.find(name);
         auto o_iter = o_table.find(name);
@@ -156,6 +160,7 @@ public:
     }
 
     /** Tests if a name is in scope */
+HALIDE_ALWAYS_INLINE
     bool contains(const std::string &name) const {
         auto m_iter = m_table.find(name);
         auto o_iter = o_table.find(name);
@@ -178,6 +183,7 @@ public:
      */
     template<typename T2 = T,
              typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
     void push(const std::string &name, const T2 &value) {
         m_table[name].push(value);
         o_table[name].push(value);
@@ -185,6 +191,7 @@ public:
 
     template<typename T2 = T,
              typename = typename std::enable_if<std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
     void push(const std::string &name) {
         m_table[name].push();
         o_table[name].push();
@@ -193,6 +200,7 @@ public:
     /** A name goes out of scope. Restore whatever its old value
      * was (or remove it entirely if there was nothing else of the
      * same name in an outer scope) */
+HALIDE_ALWAYS_INLINE
     void pop(const std::string &name) {
         auto m_iter = m_table.find(name);
         auto o_iter = o_table.find(name);
@@ -214,34 +222,43 @@ public:
     class const_iterator {
         typename std::map<std::string, SmallStack<T>>::const_iterator m_iter;
     public:
-        explicit const_iterator(const typename std::map<std::string, SmallStack<T>>::const_iterator &i) :
+HALIDE_ALWAYS_INLINE
+         explicit const_iterator(const typename std::map<std::string, SmallStack<T>>::const_iterator &i) :
             m_iter(i) {
         }
 
+HALIDE_ALWAYS_INLINE
         const_iterator() {}
 
+HALIDE_ALWAYS_INLINE
         bool operator!=(const const_iterator &other) {
             return m_iter != other.m_iter;
         }
 
+HALIDE_ALWAYS_INLINE
         void operator++() {
             ++m_iter;
         }
 
+HALIDE_ALWAYS_INLINE
         const std::string &name() {
             return m_iter->first;
         }
 
+HALIDE_ALWAYS_INLINE
         const SmallStack<T> &stack() {
             return m_iter->second;
         }
 
         template<typename T2 = T,
                  typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
         const T2 &value() {
             return m_iter->second.top_ref();
         }
     };
+
+ HALIDE_ALWAYS_INLINE
 
     const_iterator cbegin() const {
         assert(m_table.size() == o_table.size());
@@ -261,9 +278,12 @@ std::cerr<<o.str()<<std::flush;
         return const_iterator(m_table.begin());
     }
 
-    const_iterator cend() const {
+HALIDE_ALWAYS_INLINE
+     const_iterator cend() const {
         return const_iterator(m_table.end());
     }
+
+ HALIDE_ALWAYS_INLINE
 
     void swap(Scope<T> &other) {
         m_table.swap(other.m_table);
