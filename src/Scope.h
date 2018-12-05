@@ -140,7 +140,7 @@ HALIDE_ALWAYS_INLINE
         auto o_iter = o_table.find(name);
         internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
 
-        if (m_iter == m_table.end() || m_iter->second.empty()) {
+        if (o_iter == o_table.end() || o_iter->second.empty()) {
             if (containing_scope) {
                 return containing_scope->get(name);
             } else {
@@ -149,7 +149,7 @@ HALIDE_ALWAYS_INLINE
         }
         internal_assert(m_iter->first == o_iter->first);
         // internal_assert(m_iter->second == o_iter->second);
-        return m_iter->second.top();
+        return o_iter->second.top();
     }
 
     /** Return a reference to an entry. Does not consider the containing scope. */
@@ -161,7 +161,7 @@ HALIDE_ALWAYS_INLINE
         auto o_iter = o_table.find(name);
         internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
 
-        if (m_iter == m_table.end() || m_iter->second.empty()) {
+        if (o_iter == o_table.end() || o_iter->second.empty()) {
             internal_error << "Name not in Scope: " << name << "\n" << *this << "\n";
         }
 
@@ -177,7 +177,7 @@ HALIDE_ALWAYS_INLINE
         auto o_iter = o_table.find(name);
         internal_assert((m_iter == m_table.end()) == (o_iter == o_table.end()));
 
-        if (m_iter == m_table.end() || m_iter->second.empty()) {
+        if (o_iter == o_table.end() || o_iter->second.empty()) {
             if (containing_scope) {
                 return containing_scope->contains(name);
             } else {
@@ -229,6 +229,7 @@ HALIDE_ALWAYS_INLINE
         }
     }
 
+#if 0
     /** Iterate through the scope. Does not capture any containing scope. */
     class const_iterator {
         typename std::map<std::string, SmallStack<T>>::const_iterator m_iter;
@@ -292,9 +293,73 @@ HALIDE_ALWAYS_INLINE
      const_iterator cend() const {
         return const_iterator(m_table.end());
     }
+#else
+    /** Iterate through the scope. Does not capture any containing scope. */
+    class const_iterator {
+        typename std::unordered_map<std::string, SmallStack<T>>::const_iterator m_iter;
+    public:
+HALIDE_ALWAYS_INLINE
+         explicit const_iterator(const typename std::unordered_map<std::string, SmallStack<T>>::const_iterator &i) :
+            m_iter(i) {
+        }
+
+HALIDE_ALWAYS_INLINE
+        const_iterator() {}
+
+HALIDE_ALWAYS_INLINE
+        bool operator!=(const const_iterator &other) {
+            return m_iter != other.m_iter;
+        }
+
+HALIDE_ALWAYS_INLINE
+        void operator++() {
+            ++m_iter;
+        }
+
+HALIDE_ALWAYS_INLINE
+        const std::string &name() {
+            return m_iter->first;
+        }
+
+HALIDE_ALWAYS_INLINE
+        const SmallStack<T> &stack() {
+            return m_iter->second;
+        }
+
+        template<typename T2 = T,
+                 typename = typename std::enable_if<!std::is_same<T2, void>::value>::type>
+HALIDE_ALWAYS_INLINE
+        const T2 &value() {
+            return m_iter->second.top_ref();
+        }
+    };
 
  HALIDE_ALWAYS_INLINE
+    const_iterator cbegin() const {
+        assert(m_table.size() == o_table.size());
+if (m_table.size()) {
+std::ostringstream o;
+o<<"Iterating over Scope, ordered is:\n";
+for (const auto &m : m_table) {
+    o << "  " << m.first << "\n";
+}
+o<<"unordered is:\n";
+for (const auto &m : o_table) {
+    o << "  " << m.first << "\n";
+}
+o << "\n";
+std::cerr<<o.str()<<std::flush;
+}
+        return const_iterator(o_table.begin());
+    }
 
+HALIDE_ALWAYS_INLINE
+     const_iterator cend() const {
+        return const_iterator(o_table.end());
+    }
+#endif
+
+ HALIDE_ALWAYS_INLINE
     void swap(Scope<T> &other) {
         m_table.swap(other.m_table);
         o_table.swap(other.o_table);
