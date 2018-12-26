@@ -784,8 +784,8 @@ struct ArgData {
 class RunGen {
 public:
     RunGen(int (*halide_argv_call)(void **args),
-               const struct halide_filter_metadata_t *(*halide_metadata_call)()) :
-        halide_argv_call(halide_argv_call), md(halide_metadata_call()) {
+               const struct halide_filter_metadata_t *halide_metadata) :
+        halide_argv_call(halide_argv_call), md(halide_metadata) {
         if (md->version != halide_filter_metadata_t::VERSION) {
             fail() << "Unexpected metadata version " << md->version;
         }
@@ -1158,8 +1158,8 @@ public:
         out() << "Benchmark for " << md->name << " produces best case of " << result.wall_time << " sec/iter (over "
               << result.samples << " samples, "
               << result.iterations << " iterations, "
-              << "accuracy " << std::setprecision(2) << (result.accuracy * 100.0) << "%).\n"
-              << "Best output throughput is " << (megapixels_out() / result.wall_time) << " mpix/sec.\n";
+              << "accuracy " << std::setprecision(2) << (result.accuracy * 100.0) << "%); "
+              << "best throughput is " << (megapixels_out() / result.wall_time) << " mpix/sec.\n";
     }
 
     struct Output {

@@ -35,6 +35,16 @@ else
   INSTALL_NAME_TOOL_LD_FLAGS=
 endif
 
+ifeq ($(UNAME), Darwin)
+define alwayslink
+	-Wl,-force_load,$(1)
+endef
+else
+define alwayslink
+	-Wl,--whole-archive $(1) -Wl,-no-whole-archive
+endef
+endif
+
 BAZEL ?= $(shell which bazel)
 
 SHELL = bash
@@ -204,7 +214,7 @@ LLVM_SHARED_LIBS = -Wl,-rpath=$(LLVM_LIBDIR) -L $(LLVM_LIBDIR) -lLLVM
 
 LLVM_LIBS_FOR_SHARED_LIBHALIDE=$(if $(WITH_LLVM_INSIDE_SHARED_LIBHALIDE),$(LLVM_STATIC_LIBS),$(LLVM_SHARED_LIBS))
 
-TUTORIAL_CXX_FLAGS ?= -std=c++11 -g -fno-omit-frame-pointer -fno-rtti -I $(ROOT_DIR)/tools $(SANITIZER_FLAGS)
+TUTORIAL_CXX_FLAGS ?= -std=c++11 -g -fno-omit-frame-pointer $(RTTI_CXX_FLAGS) -I $(ROOT_DIR)/tools $(SANITIZER_FLAGS)
 # The tutorials contain example code with warnings that we don't want
 # to be flagged as errors, so the test flags are the tutorial flags
 # plus our warning flags.
@@ -1471,15 +1481,41 @@ $(BUILD_DIR)/RunGenMain.o: $(ROOT_DIR)/tools/RunGenMain.cpp $(RUNTIME_EXPORTED_I
 	@mkdir -p $(@D)
 	$(CXX) -c $< $(TEST_CXX_FLAGS) $(IMAGE_IO_CXX_FLAGS) -I$(INCLUDE_DIR) -I $(SRC_DIR)/runtime -I$(ROOT_DIR)/tools -o $@
 
-$(FILTERS_DIR)/%.rungen: $(BUILD_DIR)/RunGenMain.o $(BIN_DIR)/$(TARGET)/runtime.a $(ROOT_DIR)/tools/RunGenStubs.cpp $(FILTERS_DIR)/%.a
+$(FILTERS_DIR)/%.rungenstubs.o: $(ROOT_DIR)/tools/RunGenStubs.cpp $(FILTERS_DIR)/%.h
 	@mkdir -p $(@D)
-	$(CXX) -std=c++11 -DHL_RUNGEN_FILTER_HEADER=\"$*.h\" -I$(FILTERS_DIR) $^ $(GEN_AOT_LD_FLAGS) $(IMAGE_IO_LIBS) -o $@
+	$(CXX) -c $< $(TEST_CXX_FLAGS) -DHL_RUNGEN_FILTER_HEADER=\"$*.h\" -I$(FILTERS_DIR) -o $@
+
+$(FILTERS_DIR)/%.rungen: $(BUILD_DIR)/RunGenMain.o $(BIN_DIR)/$(TARGET)/runtime.a $(FILTERS_DIR)/%.rungenstubs.o $(FILTERS_DIR)/%.a
+	@mkdir -p $(@D)
+	$(CXX) -std=c++11 -I$(FILTERS_DIR) \
+		$(BUILD_DIR)/RunGenMain.o \
+		$(BIN_DIR)/$(TARGET)/runtime.a \
+		$(call alwayslink,$(FILTERS_DIR)/$*.rungenstubs.o) \
+		$(FILTERS_DIR)/$*.a \
+		$(GEN_AOT_LD_FLAGS) $(IMAGE_IO_LIBS) -o $@
 
 RUNARGS ?=
 
 $(FILTERS_DIR)/%.run: $(FILTERS_DIR)/%.rungen
 	$(CURDIR)/$< $(RUNARGS)
 	@-echo
+
+# Test linking multiple filters into a single RunGen instance
+$(FILTERS_DIR)/multi_rungen: $(BUILD_DIR)/RunGenMain.o $(BIN_DIR)/$(TARGET)/runtime.a \
+														 $(FILTERS_DIR)/blur2x2.rungenstubs.o $(FILTERS_DIR)/blur2x2.a \
+														 $(FILTERS_DIR)/cxx_mangling.rungenstubs.o $(FILTERS_DIR)/cxx_mangling.a \
+														 $(FILTERS_DIR)/pyramid.rungenstubs.o $(FILTERS_DIR)/pyramid.a
+	@mkdir -p $(@D)
+	$(CXX) -std=c++11 -I$(FILTERS_DIR) \
+			$(BUILD_DIR)/RunGenMain.o \
+			$(BIN_DIR)/$(TARGET)/runtime.a \
+			$(call alwayslink,$(FILTERS_DIR)/blur2x2.rungenstubs.o) \
+			$(call alwayslink,$(FILTERS_DIR)/cxx_mangling.rungenstubs.o) \
+			$(call alwayslink,$(FILTERS_DIR)/pyramid.rungenstubs.o) \
+			$(FILTERS_DIR)/blur2x2.a \
+			$(FILTERS_DIR)/cxx_mangling.a \
+			$(FILTERS_DIR)/pyramid.a \
+			$(GEN_AOT_LD_FLAGS) $(IMAGE_IO_LIBS) -o $@
 
 $(BIN_DIR)/tutorial_%: $(ROOT_DIR)/tutorial/%.cpp $(BIN_DIR)/libHalide.$(SHARED_EXT) $(INCLUDE_DIR)/Halide.h
 	@ if [[ $@ == *_run ]]; then \
@@ -1843,9 +1879,12 @@ install_qc: install $(HEXAGON_RUNTIME_LIBS)
 # have to guess what's necessary on their system; call
 # llvm-config and capture the result in config files that
 # we include in our distribution.
+HALIDE_RTTI_RAW=$(if $(WITH_RTTI),1,0)
+
 $(BUILD_DIR)/halide_config.%: $(ROOT_DIR)/tools/halide_config.%.tpl
 	@mkdir -p $(@D)
-	cat $< | sed -e 's/@HALIDE_SYSTEM_LIBS_RAW@/${LLVM_SYSTEM_LIBS}/g' > $@
+	cat $< | sed -e 's/@HALIDE_SYSTEM_LIBS_RAW@/${LLVM_SYSTEM_LIBS}/g' \
+	       | sed -e 's/@HALIDE_RTTI_RAW@/${HALIDE_RTTI_RAW}/g' > $@
 
 $(DISTRIB_DIR)/halide.tgz: $(LIB_DIR)/libHalide.a \
 						   $(BIN_DIR)/libHalide.$(SHARED_EXT) \
